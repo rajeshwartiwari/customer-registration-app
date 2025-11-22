@@ -12,7 +12,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
-                    sh 'git clone https://$GITHUB_TOKEN@github.com/rajeshwartiwari/customer-registration-app.git .'
+                    sh 'git clone --branch main --single-branch https://$GITHUB_TOKEN@github.com/rajeshwartiwari/customer-registration-app.git .'
                 }
             }
         }
