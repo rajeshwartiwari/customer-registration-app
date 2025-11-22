@@ -2,10 +2,10 @@ pipeline {
     agent any
     
     environment {
-        DOCKER_IMAGE = 'your-registry/customer-registration-app'
-        GKE_CLUSTER = 'your-gke-cluster'
-        GKE_ZONE = 'your-zone'
-        PROJECT_ID = 'your-project-id'
+        DOCKER_IMAGE = 'rajeshwartiwari/customer-registration-app'
+        GKE_CLUSTER = 'demo-gke'
+        GKE_ZONE = 'asia-south1-c'
+        PROJECT_ID = 'teg-cloud-bfsi-uk1'
     }
     
     stages {
@@ -45,7 +45,7 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 script {
-                    docker.withRegistry('https://your-registry', 'docker-credentials') {
+            docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
                         docker.image("${DOCKER_IMAGE}:${env.BUILD_NUMBER}").push()
                     }
                 }
