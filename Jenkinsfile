@@ -11,8 +11,9 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', 
-                url: 'https://github.com/your-username/customer-registration-app.git'
+                withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
+                    sh 'git clone https://$GITHUB_TOKEN@github.com/rajeshwartiwari/customer-registration-app.git .'
+                }
             }
         }
         
