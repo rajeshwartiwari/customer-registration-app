@@ -15,27 +15,76 @@ pipeline {
             }
         }
         
-        stage('Build and Test with Node.js 21') {
-            agent {
-                docker {
-                    image 'node:21-alpine'
-                    args '-u root:root'
-                }
-            }
+        stage('Install Node.js 21') {
             steps {
-                sh 'node --version'
-                sh 'npm --version'
+                sh '''#!/bin/bash
+                    echo "Installing Node.js 21 using NodeSource..."
+                    
+                    # Install Node.js 21 without root privileges (user space)
+                    NODE_VERSION="21"
+                    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
+                    apt-get update
+                    apt-get install -y nodejs
+                    
+                    # Verify installation
+                    echo "Node.js version:"
+                    node --version
+                    echo "npm version:"
+                    npm --version
+                '''
+            }
+        }
+        
+        stage('Install Dependencies') {
+            steps {
                 sh 'npm ci'
+            }
+        }
+        
+        stage('Run Tests') {
+            steps {
                 sh 'npm test'
+            }
+        }
+        
+        stage('Build') {
+            steps {
                 sh 'npm run build'
             }
         }
         
-        stage('Docker Build and Push') {
-            agent any
+        stage('Install Docker') {
+            steps {
+                sh '''#!/bin/bash
+                    echo "Installing Docker..."
+                    
+                    # Update package index
+                    apt-get update
+                    
+                    # Install Docker
+                    apt-get install -y docker.io
+                    
+                    # Start Docker service
+                    service docker start
+                    
+                    # Verify installation
+                    echo "Docker version:"
+                    docker --version
+                '''
+            }
+        }
+        
+        stage('Docker Build') {
             steps {
                 script {
                     sh "docker build -t ${DOCKER_IMAGE}:${env.BUILD_NUMBER} ."
+                }
+            }
+        }
+        
+        stage('Push Docker Image') {
+            steps {
+                script {
                     docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
                         docker.image("${DOCKER_IMAGE}:${env.BUILD_NUMBER}").push()
                     }
@@ -44,12 +93,11 @@ pipeline {
         }
         
         stage('Deploy to GKE') {
-            agent any
             steps {
                 script {
                     withCredentials([file(credentialsId: 'gke-service-account', variable: 'GCP_SA_KEY')]) {
                         sh '''
-                            # Install gcloud and kubectl using user-space methods
+                            # Install gcloud and kubectl
                             if ! command -v gcloud &> /dev/null; then
                                 echo "Installing Google Cloud SDK..."
                                 curl -sSL https://sdk.cloud.google.com | bash -s -- --disable-prompts > /dev/null 2>&1
@@ -60,9 +108,7 @@ pipeline {
                                 echo "Installing kubectl..."
                                 curl -LO "https://dl.k8s.io/release/\\$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
                                 chmod +x kubectl
-                                mkdir -p ~/.local/bin
-                                mv kubectl ~/.local/bin/kubectl
-                                export PATH="$HOME/.local/bin:$PATH"
+                                mv kubectl /usr/local/bin/
                             fi
                             
                             gcloud auth activate-service-account --key-file=${GCP_SA_KEY}
