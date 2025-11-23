@@ -1,5 +1,5 @@
 pipeline {
-    agent { label 'agent' }
+    agent any
     
     environment {
         DOCKER_IMAGE = 'rajeshwartiwari/customer-registration-app'
