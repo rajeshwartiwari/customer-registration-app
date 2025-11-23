@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
     
@@ -20,57 +21,49 @@ pipeline {
                 sh '''#!/bin/bash
                     echo "Installing Node.js 21 without root privileges..."
                     
-                    # Download and install Node.js in user space
+                    # Download and install Node.js in user space using .tar.gz
                     NODE_VERSION="21.7.3"
-                    cd /home/jenkins
                     
-                    # Download Node.js binary
-                    curl -fsSL https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz -o node.tar.xz
+                    # Download Node.js binary (using .tar.gz instead of .tar.xz)
+                    curl -fsSL https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.gz -o node.tar.gz
                     
-                    # Extract to user directory
-                    tar -xf node.tar.xz
-                    mv node-v${NODE_VERSION}-linux-x64 nodejs
+                    # Extract to current directory
+                    tar -xzf node.tar.gz
                     
-                    # Add to PATH
-                    export PATH="/home/jenkins/nodejs/bin:$PATH"
-                    echo 'export PATH="/home/jenkins/nodejs/bin:$PATH"' >> ~/.bashrc
+                    # Verify extraction
+                    ls -la
+                    ls -la node-v${NODE_VERSION}-linux-x64/
+                    
+                    # Set PATH for current session
+                    export PATH="$(pwd)/node-v${NODE_VERSION}-linux-x64/bin:$PATH"
                     
                     # Verify installation
                     echo "Node.js version:"
-                    node --version
+                    ./node-v${NODE_VERSION}-linux-x64/bin/node --version
                     echo "npm version:"
-                    npm --version
+                    ./node-v${NODE_VERSION}-linux-x64/bin/npm --version
                     
                     # Clean up
-                    rm node.tar.xz
+                    rm node.tar.gz
                 '''
             }
         }
         
         stage('Install Dependencies') {
             steps {
-                sh '''
-                    export PATH="/home/jenkins/nodejs/bin:$PATH"
-                    npm ci
-                '''
+                sh './node-v21.7.3-linux-x64/bin/npm ci'
             }
         }
         
         stage('Run Tests') {
             steps {
-                sh '''
-                    export PATH="/home/jenkins/nodejs/bin:$PATH"
-                    npm test
-                '''
+                sh './node-v21.7.3-linux-x64/bin/npm test'
             }
         }
         
         stage('Build') {
             steps {
-                sh '''
-                    export PATH="/home/jenkins/nodejs/bin:$PATH"
-                    npm run build
-                '''
+                sh './node-v21.7.3-linux-x64/bin/npm run build'
             }
         }
         
