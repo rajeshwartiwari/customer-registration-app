@@ -66,7 +66,7 @@ pipeline {
             steps {
                 script {
                     withCredentials([file(credentialsId: 'gke-service-account', variable: 'GCP_SA_KEY')]) {
-                        sh """
+                        sh '''#!/bin/bash
                             # Install Google Cloud SDK if not available
                             if ! command -v gcloud &> /dev/null; then
                                 echo "Installing Google Cloud SDK..."
@@ -77,19 +77,20 @@ pipeline {
                             # Install kubectl if not available
                             if ! command -v kubectl &> /dev/null; then
                                 echo "Installing kubectl..."
-                                curl -LO "https://dl.k8s.io/release/\\$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                                KUBECTL_VERSION=\\$(curl -L -s https://dl.k8s.io/release/stable.txt)
+                                curl -LO "https://dl.k8s.io/release/\\${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
                                 install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
                             fi
                             
-                            gcloud auth activate-service-account --key-file=${GCP_SA_KEY}
-                            gcloud container clusters get-credentials ${GKE_CLUSTER} --zone ${GKE_ZONE} --project ${PROJECT_ID}
+                            gcloud auth activate-service-account --key-file=''' + GCP_SA_KEY + '''
+                            gcloud container clusters get-credentials ''' + env.GKE_CLUSTER + ''' --zone ''' + env.GKE_ZONE + ''' --project ''' + env.PROJECT_ID + '''
                             
                             # Update deployment with new image
-                            sed -i 's|IMAGE_PLACEHOLDER|${DOCKER_IMAGE}:${env.BUILD_NUMBER}|g' kubernetes/deployment.yaml
+                            sed -i 's|IMAGE_PLACEHOLDER|''' + env.DOCKER_IMAGE + ''':''' + env.BUILD_NUMBER + '''|g' kubernetes/deployment.yaml
                             
                             kubectl apply -f kubernetes/
                             kubectl rollout status deployment/customer-registration-app --timeout=300s
-                        """
+                        '''
                     }
                 }
             }
