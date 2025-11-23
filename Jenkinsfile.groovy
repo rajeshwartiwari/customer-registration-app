@@ -15,13 +15,78 @@ pipeline {
             }
         }
         
-        stage('Verify Tools') {
+        stage('Install Node.js and npm') {
             steps {
-                sh '''
-                    echo "Checking available tools..."
-                    node --version || echo "Node.js not found"
-                    npm --version || echo "npm not found"
-                    docker --version || echo "Docker not found"
+                sh '''#!/bin/bash
+                    echo "Installing Node.js and npm..."
+                    
+                    # Install Node.js 18
+                    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+                    apt-get update
+                    apt-get install -y nodejs
+                    
+                    # Verify installation
+                    echo "Node.js version:"
+                    node --version
+                    echo "npm version:"
+                    npm --version
+                '''
+            }
+        }
+        
+        stage('Install Docker') {
+            steps {
+                sh '''#!/bin/bash
+                    echo "Installing Docker..."
+                    
+                    # Update package index
+                    apt-get update
+                    
+                    # Install prerequisites
+                    apt-get install -y \\
+                        ca-certificates \\
+                        curl \\
+                        gnupg \\
+                        lsb-release
+                    
+                    # Add Docker's official GPG key
+                    mkdir -p /etc/apt/keyrings
+                    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+                    
+                    # Set up the repository
+                    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+                    
+                    # Install Docker Engine
+                    apt-get update
+                    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+                    
+                    # Verify installation
+                    echo "Docker version:"
+                    docker --version
+                '''
+            }
+        }
+        
+        stage('Install Google Cloud SDK and kubectl') {
+            steps {
+                sh '''#!/bin/bash
+                    echo "Installing Google Cloud SDK and kubectl..."
+                    
+                    # Install Google Cloud SDK
+                    echo "Installing Google Cloud SDK..."
+                    curl -sSL https://sdk.cloud.google.com | bash > /dev/null 2>&1
+                    source ~/.bashrc
+                    
+                    # Install kubectl
+                    echo "Installing kubectl..."
+                    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                    install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+                    
+                    # Verify installations
+                    echo "gcloud version:"
+                    gcloud --version
+                    echo "kubectl version:"
+                    kubectl version --client
                 '''
             }
         }
@@ -66,31 +131,16 @@ pipeline {
             steps {
                 script {
                     withCredentials([file(credentialsId: 'gke-service-account', variable: 'GCP_SA_KEY')]) {
-                        sh '''#!/bin/bash
-                            # Install Google Cloud SDK if not available
-                            if ! command -v gcloud &> /dev/null; then
-                                echo "Installing Google Cloud SDK..."
-                                curl -sSL https://sdk.cloud.google.com | bash
-                                source ~/.bashrc
-                            fi
-                            
-                            # Install kubectl if not available
-                            if ! command -v kubectl &> /dev/null; then
-                                echo "Installing kubectl..."
-                                KUBECTL_VERSION=\\$(curl -L -s https://dl.k8s.io/release/stable.txt)
-                                curl -LO "https://dl.k8s.io/release/\\${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
-                                install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-                            fi
-                            
-                            gcloud auth activate-service-account --key-file=''' + GCP_SA_KEY + '''
-                            gcloud container clusters get-credentials ''' + env.GKE_CLUSTER + ''' --zone ''' + env.GKE_ZONE + ''' --project ''' + env.PROJECT_ID + '''
+                        sh """
+                            gcloud auth activate-service-account --key-file=${GCP_SA_KEY}
+                            gcloud container clusters get-credentials ${GKE_CLUSTER} --zone ${GKE_ZONE} --project ${PROJECT_ID}
                             
                             # Update deployment with new image
-                            sed -i 's|IMAGE_PLACEHOLDER|''' + env.DOCKER_IMAGE + ''':''' + env.BUILD_NUMBER + '''|g' kubernetes/deployment.yaml
+                            sed -i 's|IMAGE_PLACEHOLDER|${DOCKER_IMAGE}:${env.BUILD_NUMBER}|g' kubernetes/deployment.yaml
                             
                             kubectl apply -f kubernetes/
                             kubectl rollout status deployment/customer-registration-app --timeout=300s
-                        '''
+                        """
                     }
                 }
             }
