@@ -48,7 +48,7 @@ pipeline {
             steps {
                 script {
                     withCredentials([file(credentialsId: 'gke-service-account', variable: 'GCP_SA_KEY')]) {
-                        sh """
+                        sh '''
                             # Install gcloud and kubectl using user-space methods
                             if ! command -v gcloud &> /dev/null; then
                                 echo "Installing Google Cloud SDK..."
@@ -72,7 +72,7 @@ pipeline {
                             
                             kubectl apply -f kubernetes/
                             kubectl rollout status deployment/customer-registration-app --timeout=300s
-                        """
+                        '''
                     }
                 }
             }
