@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
     
@@ -7,6 +6,8 @@ pipeline {
         GKE_CLUSTER = 'demo-gke'
         GKE_ZONE = 'asia-south1-c'
         PROJECT_ID = 'teg-cloud-bfsi-uk1'
+        NODE_HOME = "${WORKSPACE}/node-v21.7.3-linux-x64"
+        PATH = "${WORKSPACE}/node-v21.7.3-linux-x64/bin:${env.PATH}"
     }
     
     stages {
@@ -19,51 +20,56 @@ pipeline {
         stage('Install Node.js 21') {
             steps {
                 sh '''#!/bin/bash
-                    echo "Installing Node.js 21 without root privileges..."
+                    echo "=== Installing Node.js 21 ==="
                     
-                    # Download and install Node.js in user space using .tar.gz
-                    NODE_VERSION="21.7.3"
-                    
-                    # Download Node.js binary (using .tar.gz instead of .tar.xz)
-                    curl -fsSL https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.gz -o node.tar.gz
-                    
-                    # Extract to current directory
-                    tar -xzf node.tar.gz
-                    
-                    # Verify extraction
-                    ls -la
-                    ls -la node-v${NODE_VERSION}-linux-x64/
-                    
-                    # Set PATH for current session
-                    export PATH="$(pwd)/node-v${NODE_VERSION}-linux-x64/bin:$PATH"
+                    # Check if Node.js is already installed
+                    if [ -d "node-v21.7.3-linux-x64" ]; then
+                        echo "Node.js already installed, skipping download..."
+                    else
+                        echo "Downloading Node.js..."
+                        curl -fsSL https://nodejs.org/dist/v21.7.3/node-v21.7.3-linux-x64.tar.gz -o node.tar.gz
+                        
+                        echo "Extracting Node.js..."
+                        tar -xzf node.tar.gz
+                        rm node.tar.gz
+                    fi
                     
                     # Verify installation
                     echo "Node.js version:"
-                    ./node-v${NODE_VERSION}-linux-x64/bin/node --version
+                    ./node-v21.7.3-linux-x64/bin/node --version
                     echo "npm version:"
-                    ./node-v${NODE_VERSION}-linux-x64/bin/npm --version
+                    ./node-v21.7.3-linux-x64/bin/npm --version
                     
-                    # Clean up
-                    rm node.tar.gz
+                    echo "=== Node.js installation complete ==="
                 '''
             }
         }
         
         stage('Install Dependencies') {
             steps {
-                sh './node-v21.7.3-linux-x64/bin/npm ci'
+                sh '''
+                    echo "Installing dependencies..."
+                    ./node-v21.7.3-linux-x64/bin/npm ci
+                '''
             }
         }
         
         stage('Run Tests') {
             steps {
-                sh './node-v21.7.3-linux-x64/bin/npm test'
+                sh '''
+                    echo "Running tests..."
+                    ./node-v21.7.3-linux-x64/bin/npm test
+                '''
             }
         }
         
         stage('Build') {
             steps {
-                sh './node-v21.7.3-linux-x64/bin/npm run build'
+                sh '''
+                    echo "Building application..."
+                    ./node-v21.7.3-linux-x64/bin/npm run build
+                    echo "Build completed successfully!"
+                '''
             }
         }
         
