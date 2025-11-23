@@ -15,24 +15,14 @@ pipeline {
             }
         }
         
-        stage('Install Node.js') {
+        stage('Verify Tools') {
             steps {
-                script {
-                    // Install Node.js if not available
-                    sh '''
-                        if ! command -v node &> /dev/null; then
-                            echo "Installing Node.js..."
-                            curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-                            apt-get install -y nodejs
-                        else
-                            echo "Node.js is already installed"
-                        fi
-                        
-                        # Verify installation
-                        node --version
-                        npm --version
-                    '''
-                }
+                sh '''
+                    echo "Checking available tools..."
+                    node --version || echo "Node.js not found"
+                    npm --version || echo "npm not found"
+                    docker --version || echo "Docker not found"
+                '''
             }
         }
         
@@ -42,36 +32,22 @@ pipeline {
             }
         }
         
-        stage('Unit Tests') {
+        stage('Run Tests') {
             steps {
                 sh 'npm test'
             }
-            post {
-                always {
-                    // Only publish JUnit results if test results exist
-                    script {
-                        if (fileExists('test-results.xml')) {
-                            junit 'test-results.xml'
-                        } else {
-                            echo 'No test results found, skipping JUnit report'
-                        }
-                    }
-                }
-            }
         }
         
-        stage('Build Application') {
+        stage('Build') {
             steps {
                 sh 'npm run build'
             }
         }
         
-        stage('Build Docker Image') {
+        stage('Docker Build') {
             steps {
                 script {
-                    // Check if Docker is available
-                    sh 'docker --version'
-                    docker.build("${DOCKER_IMAGE}:${env.BUILD_NUMBER}")
+                    sh "docker build -t ${DOCKER_IMAGE}:${env.BUILD_NUMBER} ."
                 }
             }
         }
@@ -94,14 +70,14 @@ pipeline {
                             # Install Google Cloud SDK if not available
                             if ! command -v gcloud &> /dev/null; then
                                 echo "Installing Google Cloud SDK..."
-                                curl https://sdk.cloud.google.com | bash
+                                curl -sSL https://sdk.cloud.google.com | bash
                                 source ~/.bashrc
                             fi
                             
                             # Install kubectl if not available
                             if ! command -v kubectl &> /dev/null; then
                                 echo "Installing kubectl..."
-                                curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                                curl -LO "https://dl.k8s.io/release/\\$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
                                 install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
                             fi
                             
@@ -127,15 +103,9 @@ pipeline {
         }
         success {
             echo "SUCCESS: Customer Registration App ${env.BUILD_NUMBER} deployed to GKE"
-            // Remove slackSend if plugin not installed, or install Slack plugin
-            // slackSend channel: '#deployments', 
-            //          message: "SUCCESS: Customer Registration App ${env.BUILD_NUMBER} deployed to GKE"
         }
         failure {
             echo "FAILED: Customer Registration App ${env.BUILD_NUMBER} deployment failed"
-            // Remove slackSend if plugin not installed, or install Slack plugin
-            // slackSend channel: '#deployments', 
-            //          message: "FAILED: Customer Registration App ${env.BUILD_NUMBER} deployment failed"
         }
     }
 }
