@@ -1,5 +1,43 @@
 pipeline {
-    agent any
+    agent {
+        kubernetes {
+            yaml '''
+apiVersion: v1
+kind: Pod
+metadata:
+  name: jenkins-agent
+spec:
+  containers:
+  - name: jnlp
+    image: jenkins/inbound-agent:3345.v03dee9b_f88fc-6
+    resources:
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+    volumeMounts:
+    - name: docker-sock
+      mountPath: /var/run/docker.sock
+  - name: node
+    image: node:21-alpine
+    command: ["cat"]
+    tty: true
+    resources:
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+  volumes:
+  - name: docker-sock
+    hostPath:
+      path: /var/run/docker.sock
+'''
+        }
+    }
     
     environment {
         DOCKER_IMAGE = 'rajeshwartiwari/customer-registration-app'
@@ -15,107 +53,59 @@ pipeline {
             }
         }
         
-        stage('Install Node.js 21') {
-            steps {
-                sh '''#!/bin/bash
-                    echo "=== Installing Node.js 21 ==="
-                    
-                    if [ ! -f "node-v21.7.3-linux-x64/bin/node" ]; then
-                        echo "Downloading Node.js..."
-                        curl -fsSL https://nodejs.org/dist/v21.7.3/node-v21.7.3-linux-x64.tar.gz -o node.tar.gz
-                        tar -xzf node.tar.gz
-                        rm node.tar.gz
-                    fi
-                    
-                    echo "Node.js: $(./node-v21.7.3-linux-x64/bin/node --version)"
-                    echo "✅ Node.js installation complete"
-                '''
-            }
-        }
-        
         stage('Install Dependencies') {
-            steps {
-                sh '''
-                    echo "=== Installing all dependencies ==="
-                    
-                    # Add Node.js to PATH
-                    export PATH="$(pwd)/node-v21.7.3-linux-x64/bin:${PATH}"
-                    
-                    # Install all dependencies (including devDependencies)
-                    npm install --prefer-offline --no-audit --no-fund
-                    
-                    echo "✅ Dependencies installed successfully!"
-                '''
+            container('node') {
+                steps {
+                    sh '''
+                        echo "=== Installing dependencies ==="
+                        npm install --prefer-offline --no-audit --no-fund
+                        echo "✅ Dependencies installed successfully!"
+                    '''
+                }
             }
         }
         
         stage('Run Tests') {
-            steps {
-                sh '''
-                    echo "=== Running tests ==="
-                    
-                    # Add Node.js to PATH
-                    export PATH="$(pwd)/node-v21.7.3-linux-x64/bin:${PATH}"
-                    
-                    # Run tests
-                    npm test
-                    
-                    echo "✅ Tests completed!"
-                '''
+            container('node') {
+                steps {
+                    sh '''
+                        echo "=== Running tests ==="
+                        npm test
+                        echo "✅ Tests completed!"
+                    '''
+                }
             }
         }
         
         stage('Build') {
-            steps {
-                sh '''
-                    echo "=== Building application ==="
-                    
-                    # Add Node.js to PATH
-                    export PATH="$(pwd)/node-v21.7.3-linux-x64/bin:${PATH}"
-                    
-                    # Build application
-                    npm run build
-                    
-                    echo "✅ Build completed successfully!"
-                '''
-            }
-        }
-        
-        stage('Install Docker') {
-            steps {
-                sh '''#!/bin/bash
-                    echo "=== Installing Docker ==="
-                    
-                    # Update package list
-                    apt-get update
-                    
-                    # Install Docker
-                    apt-get install -y docker.io
-                    
-                    # Start Docker service
-                    service docker start
-                    
-                    # Verify Docker installation
-                    docker --version
-                    
-                    echo "✅ Docker installed successfully!"
-                '''
+            container('node') {
+                steps {
+                    sh '''
+                        echo "=== Building application ==="
+                        npm run build
+                        echo "✅ Build completed successfully!"
+                    '''
+                }
             }
         }
         
         stage('Docker Build') {
-            steps {
-                script {
-                    sh "docker build -t ${DOCKER_IMAGE}:${env.BUILD_NUMBER} ."
+            container('jnlp') {
+                steps {
+                    script {
+                        sh "docker build -t ${DOCKER_IMAGE}:${env.BUILD_NUMBER} ."
+                    }
                 }
             }
         }
         
         stage('Push Docker Image') {
-            steps {
-                script {
-                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
-                        docker.image("${DOCKER_IMAGE}:${env.BUILD_NUMBER}").push()
+            container('jnlp') {
+                steps {
+                    script {
+                        docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
+                            docker.image("${DOCKER_IMAGE}:${env.BUILD_NUMBER}").push()
+                        }
                     }
                 }
             }
