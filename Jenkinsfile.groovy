@@ -54,16 +54,10 @@ pipeline {
                     
                     # Verify installation properly
                     echo "=== Verifying Node.js installation ==="
-                    echo "Current directory: $(pwd)"
-                    echo "Node.js directory contents:"
-                    ls -la node-*/bin/ 2>/dev/null || ls -la
-                    
-                    # Set PATH for current session to use the installed Node.js
                     export PATH="$(pwd)/node-v21.7.3-linux-x64/bin:${PATH}"
                     echo "Updated PATH: $PATH"
                     
-                    # Try to run node
-                    echo "Checking Node.js installation..."
+                    # Check Node.js installation
                     node --version || (echo "Node.js not in PATH"; exit 1)
                     npm --version || (echo "npm not in PATH"; exit 1)
                     
@@ -85,8 +79,21 @@ pipeline {
                     echo "npm version:"
                     npm --version
                     
-                    echo "Installing dependencies..."
-                    npm install
+                    # Increase Node.js memory limit for npm install
+                    export NODE_OPTIONS="--max-old-space-size=4096"
+                    
+                    echo "Installing dependencies with increased memory limit..."
+                    
+                    # Install dependencies with memory optimizations
+                    npm install --verbose || {
+                        echo "First npm install attempt failed, trying with more memory..."
+                        # Try alternative approach with npm cache clean
+                        npm cache clean --force
+                        npm install --verbose || {
+                            echo "npm install failed again, trying CI mode..."
+                            npm ci --verbose
+                        }
+                    }
                     
                     echo "✅ Dependencies installed successfully!"
                 '''
@@ -100,6 +107,9 @@ pipeline {
                     
                     # Add Node.js to PATH for this stage
                     export PATH="$(pwd)/node-v21.7.3-linux-x64/bin:${PATH}"
+                    
+                    # Increase memory for tests
+                    export NODE_OPTIONS="--max-old-space-size=4096"
                     
                     echo "Running tests..."
                     npm test
@@ -116,6 +126,9 @@ pipeline {
                     
                     # Add Node.js to PATH for this stage
                     export PATH="$(pwd)/node-v21.7.3-linux-x64/bin:${PATH}"
+                    
+                    # Increase memory for build
+                    export NODE_OPTIONS="--max-old-space-size=4096"
                     
                     echo "Building application..."
                     npm run build
