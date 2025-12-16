@@ -54,8 +54,8 @@ spec:
         }
         
         stage('Install Dependencies') {
-            container('node') {
-                steps {
+            steps {
+                container('node') {
                     sh '''
                         echo "=== Installing dependencies ==="
                         npm install --prefer-offline --no-audit --no-fund
@@ -66,8 +66,8 @@ spec:
         }
         
         stage('Run Tests') {
-            container('node') {
-                steps {
+            steps {
+                container('node') {
                     sh '''
                         echo "=== Running tests ==="
                         npm test
@@ -78,8 +78,8 @@ spec:
         }
         
         stage('Build') {
-            container('node') {
-                steps {
+            steps {
+                container('node') {
                     sh '''
                         echo "=== Building application ==="
                         npm run build
@@ -90,8 +90,8 @@ spec:
         }
         
         stage('Docker Build') {
-            container('jnlp') {
-                steps {
+            steps {
+                container('jnlp') {
                     script {
                         sh "docker build -t ${DOCKER_IMAGE}:${env.BUILD_NUMBER} ."
                     }
@@ -100,8 +100,8 @@ spec:
         }
         
         stage('Push Docker Image') {
-            container('jnlp') {
-                steps {
+            steps {
+                container('jnlp') {
                     script {
                         docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
                             docker.image("${DOCKER_IMAGE}:${env.BUILD_NUMBER}").push()
