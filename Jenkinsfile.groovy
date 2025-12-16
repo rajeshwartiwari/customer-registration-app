@@ -1,6 +1,11 @@
 pipeline {
     agent any
-    
+      environment {
+        DOCKER_IMAGE = 'rajeshwartiwari/customer-registration-app'
+        GKE_CLUSTER = 'demo-gke'
+        GKE_ZONE = 'asia-south1-c'
+        PROJECT_ID = 'teg-cloud-bfsi-uk1'
+    }
     stages {
         stage('Checkout') {
             steps {
@@ -184,6 +189,26 @@ pipeline {
                 '''
             }
         }
+
+         stage('Docker Build') {
+            steps {
+                script {
+                    sh "docker build -t ${DOCKER_IMAGE}:${env.BUILD_NUMBER} ."
+                }
+            }
+        }
+        
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
+                        docker.image("${DOCKER_IMAGE}:${env.BUILD_NUMBER}").push()
+                    }
+                }
+            }
+        }
+
+        
     }
     
     post {
