@@ -58,22 +58,16 @@ pipeline {
                     echo "Node.js directory contents:"
                     ls -la node-*/bin/ 2>/dev/null || ls -la
                     
-                    # Try to run node with full path
-                    NODE_PATH=$(find . -name node -type f -executable | head -1)
-                    if [ -n "$NODE_PATH" ]; then
-                        echo "Found node at: $NODE_PATH"
-                        $NODE_PATH --version
-                        NPM_PATH=$(find . -name npm -type f -executable | head -1)
-                        if [ -n "$NPM_PATH" ]; then
-                            echo "Found npm at: $NPM_PATH"
-                            $NPM_PATH --version
-                        else
-                            echo "npm not found"
-                        fi
-                    else
-                        echo "Node.js binary not found or not executable"
-                        exit 1
-                    fi
+                    # Set PATH for current session to use the installed Node.js
+                    export PATH="$(pwd)/node-v21.7.3-linux-x64/bin:${PATH}"
+                    echo "Updated PATH: $PATH"
+                    
+                    # Try to run node
+                    echo "Checking Node.js installation..."
+                    node --version || (echo "Node.js not in PATH"; exit 1)
+                    npm --version || (echo "npm not in PATH"; exit 1)
+                    
+                    echo "✅ Node.js installation verified!"
                 '''
             }
         }
@@ -81,18 +75,20 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh '''
-                    echo "Installing dependencies..."
+                    echo "=== Installing dependencies ==="
                     
-                    # Find npm path
-                    NPM_PATH=$(find . -name npm -type f -executable | head -1)
-                    if [ -n "$NPM_PATH" ]; then
-                        echo "Using npm from: $NPM_PATH"
-                        $NPM_PATH install
-                        echo "✅ Dependencies installed successfully!"
-                    else
-                        echo "❌ npm not found"
-                        exit 1
-                    fi
+                    # Add Node.js to PATH for this stage
+                    export PATH="$(pwd)/node-v21.7.3-linux-x64/bin:${PATH}"
+                    
+                    echo "Node.js version:"
+                    node --version
+                    echo "npm version:"
+                    npm --version
+                    
+                    echo "Installing dependencies..."
+                    npm install
+                    
+                    echo "✅ Dependencies installed successfully!"
                 '''
             }
         }
@@ -100,9 +96,14 @@ pipeline {
         stage('Run Tests') {
             steps {
                 sh '''
+                    echo "=== Running tests ==="
+                    
+                    # Add Node.js to PATH for this stage
+                    export PATH="$(pwd)/node-v21.7.3-linux-x64/bin:${PATH}"
+                    
                     echo "Running tests..."
-                    NPM_PATH=$(find . -name npm -type f -executable | head -1)
-                    $NPM_PATH test
+                    npm test
+                    
                     echo "✅ Tests completed successfully!"
                 '''
             }
@@ -111,9 +112,14 @@ pipeline {
         stage('Build') {
             steps {
                 sh '''
+                    echo "=== Building application ==="
+                    
+                    # Add Node.js to PATH for this stage
+                    export PATH="$(pwd)/node-v21.7.3-linux-x64/bin:${PATH}"
+                    
                     echo "Building application..."
-                    NPM_PATH=$(find . -name npm -type f -executable | head -1)
-                    $NPM_PATH run build
+                    npm run build
+                    
                     echo "✅ Build completed successfully!"
                 '''
             }
