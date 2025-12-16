@@ -1,3 +1,5 @@
+const { describe, test, beforeEach, jest: jestMock } = require('@jest/globals')
+
 let customers = []
 let currentId = 1
 
@@ -148,4 +150,4 @@ describe('Customer API', () => {
     expect(res.status).toHaveBeenCalledWith(404)
     expect(res.json).toHaveBeenCalledWith({ error: 'Customer not found' })
   })
-}
+})
