@@ -12,14 +12,11 @@ spec:
     image: jenkins/inbound-agent:3345.v03dee9b_f88fc-6
     resources:
       limits:
-        memory: "2Gi"
-        cpu: "1000m"
-      requests:
         memory: "1Gi"
         cpu: "500m"
-    volumeMounts:
-    - name: docker-sock
-      mountPath: /var/run/docker.sock
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
   - name: node
     image: node:21-alpine
     command: ["cat"]
@@ -31,19 +28,30 @@ spec:
       requests:
         memory: "512Mi"
         cpu: "250m"
-  volumes:
-  - name: docker-sock
-    hostPath:
-      path: /var/run/docker.sock
+  - name: dind
+    image: docker:dind
+    securityContext:
+      privileged: true
+    args:
+    - dockerd
+    - --host=tcp://0.0.0.0:2375
+    env:
+    - name: DOCKER_TLS_CERTDIR
+      value: ""
+    resources:
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
 '''
         }
     }
     
     environment {
         DOCKER_IMAGE = 'rajeshwartiwari/customer-registration-app'
-        GKE_CLUSTER = 'demo-gke'
-        GKE_ZONE = 'asia-south1-c'
-        PROJECT_ID = 'teg-cloud-bfsi-uk1'
+        DOCKER_HOST = 'tcp://localhost:2375'
     }
     
     stages {
@@ -89,9 +97,22 @@ spec:
             }
         }
         
+        stage('Install Docker Client in Node Container') {
+            steps {
+                container('node') {
+                    sh '''
+                        echo "=== Installing Docker client ==="
+                        apk add --no-cache docker-cli
+                        docker --version
+                        echo "✅ Docker client installed!"
+                    '''
+                }
+            }
+        }
+        
         stage('Docker Build') {
             steps {
-                container('jnlp') {
+                container('node') {
                     script {
                         sh "docker build -t ${DOCKER_IMAGE}:${env.BUILD_NUMBER} ."
                     }
@@ -101,7 +122,7 @@ spec:
         
         stage('Push Docker Image') {
             steps {
-                container('jnlp') {
+                container('node') {
                     script {
                         docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
                             docker.image("${DOCKER_IMAGE}:${env.BUILD_NUMBER}").push()
